@@ -1,19 +1,33 @@
--- Full Moon Notifier AutoHop | By Chiriku
--- Chỉ thông báo nếu server hiện tại là Full Moon, sau đó auto hop tiếp
--- Webhook gửi liên tục khi tìm thấy server Full Moon
-
 --// CONFIG
-local Webhook = "https://discord.com/api/webhooks/1366669467127382086/W-zfpbHnsXkpf8UZqzf9amT1nTYOBCOkKfwWJPa2ieIE81Jp-ZCKyq_lqyvc85ncfwa8"
+getgenv().Webhook = "https://discord.com/api/webhooks/1366669467127382086/W-zfpbHnsXkpf8UZqzf9amT1nTYOBCOkKfwWJPa2ieIE81Jp-ZCKyq_lqyvc85ncfwa8"
+
+--// SERVICES
 local HttpService = game:GetService("HttpService")
-local TPService = game:GetService("TeleportService")
 local Players = game:GetService("Players")
+local TeleportService = game:GetService("TeleportService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+--// SERVER TRACKING
+local checkedServers = {}
+checkedServers[game.JobId] = true
+
+--// TEXTLABEL STATUS
+local screenGui = Instance.new("ScreenGui", game.CoreGui)
+local textLabel = Instance.new("TextLabel", screenGui)
+textLabel.Size = UDim2.new(0.4, 0, 0.07, 0)
+textLabel.Position = UDim2.new(0.3, 0, 0.01, 0)
+textLabel.BackgroundTransparency = 1
+textLabel.TextScaled = true
+textLabel.Font = Enum.Font.GothamBold
+textLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+textLabel.TextStrokeTransparency = 0.5
+textLabel.Text = "Full Moon Notify🌕: Checking..."
 
 --// FUNCTION SEND WEBHOOK
 function sendFullMoonWebhook(jobId, moonPhase, players, remainingTime)
     local playerCount = tostring(players).."/12"
     local embed = {
         ["title"] = "**Full Moon Notify🌕**",
-        ["description"] = "",
         ["color"] = 5814783,
         ["fields"] = {
             {
@@ -52,52 +66,56 @@ function sendFullMoonWebhook(jobId, moonPhase, players, remainingTime)
 
     local data = {
         ["embeds"] = {embed},
-        ["username"] = "Full Moon Notifier",
+        ["username"] = "Full Moon",
         ["avatar_url"] = "https://cdn.discordapp.com/emojis/1087739432068577280.webp"
     }
 
-    local body = HttpService:JSONEncode(data)
     pcall(function()
         syn.request({
-            Url = Webhook,
+            Url = getgenv().Webhook,
             Method = "POST",
-            Headers = {["Content-Type"] = "application/json"},
-            Body = body
+            Headers = {
+                ["Content-Type"] = "application/json"
+            },
+            Body = HttpService:JSONEncode(data)
         })
     end)
 end
 
 --// CHECK FULL MOON
-function checkFullMoon()
+function isFullMoon()
     local success, result = pcall(function()
-        return game:GetService("ReplicatedStorage").Remotes:FindFirstChild("CommF_"):InvokeServer("GetMoon")
+        return ReplicatedStorage.Remotes:FindFirstChild("CommF_"):InvokeServer("GetMoon")
     end)
     return success and result == "FullMoon", result
 end
 
---// LOOP + AUTO HOP
-while true do
-    local isFull, moonState = checkFullMoon()
-    local jobId = game.JobId
-    local players = #Players:GetPlayers()
-    local moonPhase = moonState == "FullMoon" and 5 or tonumber(string.match(tostring(moonState), "%d+")) or 0
-    local remainingTime = moonPhase == 5 and "5" or tostring(5 - moonPhase)
+--// SMART SERVER HOP
+function serverHop()
+    local servers = {}
+    local response = game:HttpGet("https://games.roblox.com/v1/games/2753915549/servers/Public?limit=100&sortOrder=Desc")
+    local data = HttpService:JSONDecode(response)
 
-    if isFull then
-        sendFullMoonWebhook(jobId, moonPhase, players, remainingTime)
-        wait(10) -- chờ 1 chút cho webhook gửi xong
-    end
-
-    -- Hop tiếp server
-    local servers = game:GetService("HttpService"):JSONDecode(
-        game:HttpGet("https://games.roblox.com/v1/games/"..game.PlaceId.."/servers/Public?sortOrder=Desc&limit=100")
-    )
-    for _, srv in pairs(servers.data) do
-        if srv.playing < srv.maxPlayers and srv.id ~= game.JobId then
-            TPService:TeleportToPlaceInstance(game.PlaceId, srv.id)
-            return
+    for _, server in pairs(data.data) do
+        if server.playing < server.maxPlayers and not checkedServers[server.id] then
+            checkedServers[server.id] = true
+            TeleportService:TeleportToPlaceInstance(2753915549, server.id)
+            break
         end
     end
+end
 
-    wait(5)
+--// MAIN LOOP
+while true do
+    local fullMoon, phase = isFullMoon()
+    textLabel.Text = "Full Moon Notify🌕: Moon Phase "..tostring(phase).."/5"
+
+    if fullMoon then
+        sendFullMoonWebhook(game.JobId, 5, #Players:GetPlayers(), "5")
+        task.wait(2) -- Chờ nhẹ để đảm bảo webhook gửi
+        serverHop()
+    else
+        task.wait(math.random(3, 5)) -- Delay 3–5s nếu không phải Full Moon
+        serverHop()
+    end
 end

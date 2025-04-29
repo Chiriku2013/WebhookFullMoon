@@ -7,26 +7,38 @@ local Players = game:GetService("Players")
 local PlaceId = game.PlaceId
 local visited = {}
 
---// Giao diện UI
+--// Moon phase format
+local moonPhases = {
+    "NewMoon", "WaxingCrescent", "FirstQuarter", "WaxingGibbous",
+    "FullMoon", "WaningGibbous", "LastQuarter", "WaningCrescent"
+}
+local function getPhaseIndex(name)
+    for i, phase in ipairs(moonPhases) do
+        if phase == name then return i end
+    end
+    return nil
+end
+
+--// UI
 local ScreenGui = Instance.new("ScreenGui", game.CoreGui)
 ScreenGui.Name = "FullMoonUI"
 local TextLabel = Instance.new("TextLabel", ScreenGui)
-TextLabel.Size = UDim2.new(0.4, 0, 0.05, 0)
-TextLabel.Position = UDim2.new(0.3, 0, 0, 10)
+TextLabel.Size = UDim2.new(0.6, 0, 0.08, 0)
+TextLabel.Position = UDim2.new(0.2, 0, 0, 10)
 TextLabel.BackgroundTransparency = 1
 TextLabel.TextScaled = true
-TextLabel.Font = Enum.Font.GothamBold
+TextLabel.Font = Enum.Font.GothamBlack
 TextLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-TextLabel.TextStrokeTransparency = 0.3
-TextLabel.Text = "Checking moon phase..."
+TextLabel.TextStrokeTransparency = 0.2
+TextLabel.Text = "Đang kiểm tra pha mặt trăng..."
 
---// Send Webhook
-function sendWebhook(jobId, moonPhase, players)
+--// Gửi Webhook
+function sendWebhook(jobId, phaseIndex, players)
     local embed = {
         ["title"] = "**Full Moon Notify🌕**",
         ["color"] = 5814783,
         ["fields"] = {
-            {["name"] = "🌕 Moon Phase:", ["value"] = tostring(moonPhase).."/8", ["inline"] = true},
+            {["name"] = "🌕 Moon Phase:", ["value"] = tostring(phaseIndex).."/8", ["inline"] = true},
             {["name"] = "👥 Players:", ["value"] = tostring(players).."/12", ["inline"] = true},
             {["name"] = "🔗 Job ID:", ["value"] = jobId, ["inline"] = false},
             {["name"] = "📜 Script Join:", ["value"] = 'game:GetService("ReplicatedStorage").__ServerBrowser:InvokeServer("teleport", "'..jobId..'")', ["inline"] = false}
@@ -48,7 +60,11 @@ function getMoonPhase()
     local ok, result = pcall(function()
         return ReplicatedStorage.Remotes.CommF_:InvokeServer("GetMoon")
     end)
-    return ok and result or "nil"
+    if ok and typeof(result) == "string" then
+        local index = getPhaseIndex(result)
+        return result, index or 0
+    end
+    return "Unknown", 0
 end
 
 --// Server Hop
@@ -60,7 +76,7 @@ function hopServer()
         for _, server in ipairs(data.data) do
             if server.playing < server.maxPlayers and not visited[server.id] and server.id ~= game.JobId then
                 visited[server.id] = true
-                queue_on_teleport('loadstring(game:HttpGet("https://raw.githubusercontent.com/Chiriku2013/WebhookFullMoon/refs/heads/main/WebhookFullMoon.lua"))()')
+                queue_on_teleport('loadstring(game:HttpGet("https://raw.githubusercontent.com/Chiriku2013/WebhookFullMoon/main/WebhookFullMoon.lua"))()')
                 TeleportService:TeleportToPlaceInstance(PlaceId, server.id)
                 return
             end
@@ -69,17 +85,17 @@ function hopServer()
     end
 end
 
---// Vòng lặp chính
+--// MAIN
 while true do
-    local phase = getMoonPhase()
-    TextLabel.Text = "Full Moon Notify🌕: Moon Phase "..tostring(phase)
-
-    if tostring(phase) == "FullMoon" then
-        sendWebhook(game.JobId, 8, #Players:GetPlayers())
+    local name, index = getMoonPhase()
+    TextLabel.Text = "Moon Phase: "..name.." ("..index.."/8)"
+    
+    if name == "FullMoon" and index == 5 then
+        sendWebhook(game.JobId, index, #Players:GetPlayers())
         task.wait(2)
-        hopServer() -- Tiếp tục hop để thông báo nhiều server có full moon
+        hopServer()
     else
-        task.wait(math.random(3, 5))
+        task.wait(math.random(4, 6))
         hopServer()
     end
 end

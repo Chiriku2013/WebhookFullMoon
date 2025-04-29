@@ -6,89 +6,92 @@ local Players = game:GetService("Players")
 local TeleportService = game:GetService("TeleportService")
 
 --// GUI
-local ScreenGui = Instance.new("ScreenGui", game:GetService("CoreGui"))
-local Label = Instance.new("TextLabel", ScreenGui)
-Label.Size = UDim2.new(0.5, 0, 0, 50)
-Label.Position = UDim2.new(0.25, 0, 0, 0)
-Label.BackgroundTransparency = 1
-Label.TextScaled = true
-Label.Font = Enum.Font.GothamBold
-Label.TextColor3 = Color3.fromRGB(255, 255, 255)
-Label.TextStrokeTransparency = 0.5
-Label.Text = "Full Moon Notify🌕: Checking..."
+local gui = Instance.new("ScreenGui", game.CoreGui)
+local label = Instance.new("TextLabel", gui)
+label.Size = UDim2.new(0.5, 0, 0, 40)
+label.Position = UDim2.new(0.25, 0, 0, 0)
+label.BackgroundTransparency = 1
+label.TextScaled = true
+label.Font = Enum.Font.GothamBold
+label.TextColor3 = Color3.fromRGB(255, 255, 255)
+label.TextStrokeTransparency = 0.4
+label.Text = "Full Moon Notify🌕: Checking..."
 
---// SERVER HISTORY
+--// Server cache
 local visited = {}
 
---// SEND WEBHOOK
-function sendWebhook(jobId, moonPhase, playerCount)
-	local embed = {
-		["title"] = "**Full Moon Notify🌕**",
-		["color"] = 5814783,
-		["fields"] = {
-			{["name"] = "🌕 Moon Phase:", ["value"] = tostring(moonPhase), ["inline"] = true},
-			{["name"] = "👥 Players:", ["value"] = tostring(playerCount).."/12", ["inline"] = true},
-			{["name"] = "🔗 Job ID:", ["value"] = jobId, ["inline"] = false},
-			{["name"] = "📜 Script Join:", ["value"] = 'game:GetService("ReplicatedStorage").__ServerBrowser:InvokeServer("teleport", "'..jobId..'")', ["inline"] = false}
-		},
-		["footer"] = {["text"] = "MADE BY: CHIRIKU | "..os.date("Hôm nay lúc %H:%M")},
-		["thumbnail"] = {["url"] = "https://upload.wikimedia.org/wikipedia/commons/3/3c/FullMoon2010.jpg"}
-	}
+--// Send Webhook
+function sendWebhook(jobId, phase, playerCount)
 	local data = {
-		["embeds"] = {embed},
+		["embeds"] = {{
+			["title"] = "**Full Moon Notify🌕**",
+			["color"] = 5814783,
+			["fields"] = {
+				{["name"] = "🌕 Moon Phase", ["value"] = tostring(phase), ["inline"] = true},
+				{["name"] = "👥 Players", ["value"] = tostring(playerCount).."/12", ["inline"] = true},
+				{["name"] = "🔗 Job ID", ["value"] = jobId, ["inline"] = false},
+				{["name"] = "📜 Script Join", ["value"] = 'game:GetService("ReplicatedStorage").__ServerBrowser:InvokeServer("teleport", "'..jobId..'")'}
+			},
+			["footer"] = {["text"] = "MADE BY: CHIRIKU | "..os.date("Hôm nay lúc %H:%M")},
+			["thumbnail"] = {["url"] = "https://upload.wikimedia.org/wikipedia/commons/3/3c/FullMoon2010.jpg"}
+		}},
 		["username"] = "Full Moon",
 		["avatar_url"] = "https://cdn.discordapp.com/emojis/1087739432068577280.webp"
 	}
-	local body = HttpService:JSONEncode(data)
 	pcall(function()
 		syn.request({
 			Url = Webhook,
 			Method = "POST",
 			Headers = {["Content-Type"] = "application/json"},
-			Body = body
+			Body = HttpService:JSONEncode(data)
 		})
 	end)
 end
 
---// CHECK MOON
+--// Get Moon
 function getMoonPhase()
-	local success, result = pcall(function()
-		return ReplicatedStorage.Remotes:FindFirstChild("CommF_"):InvokeServer("GetMoon")
+	local ok, result = pcall(function()
+		return ReplicatedStorage.Remotes.CommF_:InvokeServer("GetMoon")
 	end)
-	if success then
+	if ok then
 		return result
 	else
-		return "Error"
+		return nil
 	end
 end
 
---// SMART HOP
-function hopServer()
-	local servers = ReplicatedStorage:WaitForChild("__ServerBrowser"):GetServers()
-	for _, server in pairs(servers) do
-		if not visited[server] then
-			visited[server] = true
-			ReplicatedStorage.__ServerBrowser:InvokeServer("teleport", server)
+--// Smart Hop
+function smartHop()
+	local servers = ReplicatedStorage.__ServerBrowser:GetServers()
+	for _, srv in pairs(servers) do
+		if not visited[srv] then
+			visited[srv] = true
+			ReplicatedStorage.__ServerBrowser:InvokeServer("teleport", srv)
 			break
 		end
 	end
 end
 
---// MAIN LOOP
+--// Main
 while true do
 	local moon = getMoonPhase()
+
 	if moon == "FullMoon" then
-		Label.Text = "Full Moon Notify🌕: FULL MOON!!!"
-		sendWebhook(game.JobId, "FullMoon", #Players:GetPlayers())
+		label.Text = "Full Moon Notify🌕: FULL MOON!!!"
+		sendWebhook(game.JobId, moon, #Players:GetPlayers())
 		task.wait(2)
-		hopServer()
-	elseif moon == nil then
-		Label.Text = "Full Moon Notify🌕: Đang trời sáng"
+		smartHop()
+	elseif type(moon) == "string" then
+		label.Text = "Full Moon Notify🌕: "..moon
 		task.wait(math.random(3, 5))
-		hopServer()
+		smartHop()
+	elseif type(moon) == "number" then
+		label.Text = "Full Moon Notify🌕: Phase "..moon.."/5"
+		task.wait(math.random(3, 5))
+		smartHop()
 	else
-		Label.Text = "Full Moon Notify🌕: Moon Phase "..tostring(moon)
+		label.Text = "Full Moon Notify🌕: Trời sáng hoặc không xác định"
 		task.wait(math.random(3, 5))
-		hopServer()
+		smartHop()
 	end
 end

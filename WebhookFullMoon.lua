@@ -53,6 +53,7 @@ function sendFullMoonWebhook(jobId, moonPhase, players, remainingTime)
 
     local body = HttpService:JSONEncode(data)
 
+    -- Gửi webhook vào Discord
     syn.request({
         Url = Webhook,
         Method = "POST",
@@ -69,7 +70,7 @@ function isFullMoon()
         return ReplicatedStorage.Remotes:FindFirstChild("CommF_"):InvokeServer("GetMoon")
     end)
 
-    -- Nếu không phải FullMoon hoặc là "nil" (trời sáng), trả về false
+    -- Kiểm tra kết quả trả về
     if not success or result == nil or result ~= "FullMoon" then
         return false, result or "None"
     end
@@ -98,6 +99,7 @@ while true do
     -- Cập nhật giao diện
     textLabel.Text = "Full Moon Notify🌕: Moon Phase "..tostring(phase)
 
+    -- Kiểm tra Full Moon
     if isFull then
         sendFullMoonWebhook(game.JobId, 5, #Players:GetPlayers(), "5")
         task.wait(2)

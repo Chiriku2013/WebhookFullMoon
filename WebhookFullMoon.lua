@@ -41,17 +41,26 @@ function sendWebhook(jobId, phaseIndex, players)
             {["name"] = "🌕 Moon Phase:", ["value"] = tostring(phaseIndex).."/8", ["inline"] = true},
             {["name"] = "👥 Players:", ["value"] = tostring(players).."/12", ["inline"] = true},
             {["name"] = "🔗 Job ID:", ["value"] = jobId, ["inline"] = false},
-            {["name"] = "📜 Script Join:", ["value"] = 'game:GetService("ReplicatedStorage").__ServerBrowser:InvokeServer("teleport", "'..jobId..'")', ["inline"] = false}
+            {["name"] = "📜 Script Join:", ["value"] = 'game:GetService("ReplicatedStorage").__ServerBrowser:InvokeServer("teleport", "'..jobId..'")', ["inline"] = false},
+            {["name"] = "Credit", ["value"] = "**MADE BY: CHIRIKU**", ["inline"] = false}
         },
-        ["footer"] = {["text"] = "CHIRIKU BOT | "..os.date("Lúc %H:%M:%S")},
-        ["thumbnail"] = {["url"] = "https://upload.wikimedia.org/wikipedia/commons/3/3c/FullMoon2010.jpg"}
+        ["footer"] = {
+            ["text"] = "MADE BY: CHIRIKU | "..os.date("Lúc %H:%M:%S")
+        },
+        ["thumbnail"] = {
+            ["url"] = "https://upload.wikimedia.org/wikipedia/commons/3/3c/FullMoon2010.jpg"
+        }
     }
 
     syn.request({
         Url = Webhook,
         Method = "POST",
         Headers = {["Content-Type"] = "application/json"},
-        Body = HttpService:JSONEncode({["embeds"] = {embed}, ["username"] = "Full Moon", ["avatar_url"] = "https://cdn.discordapp.com/emojis/1087739432068577280.webp"})
+        Body = HttpService:JSONEncode({
+            ["embeds"] = {embed},
+            ["username"] = "Full Moon",
+            ["avatar_url"] = "https://cdn.discordapp.com/emojis/1087739432068577280.webp"
+        })
     })
 end
 
@@ -89,7 +98,7 @@ end
 while true do
     local name, index = getMoonPhase()
     TextLabel.Text = "Moon Phase: "..name.." ("..index.."/8)"
-    
+
     if name == "FullMoon" and index == 5 then
         sendWebhook(game.JobId, index, #Players:GetPlayers())
         task.wait(2)

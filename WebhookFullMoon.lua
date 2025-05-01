@@ -88,6 +88,11 @@ function getMoonPhase()
     return "Unknown", 0
 end
 
+--// Kiểm tra xem pha trăng có phải là Full Moon không
+function isFullMoon(phaseName, index)
+    return phaseName == "FullMoon" and index == 5
+end
+
 --// Server Hop
 function hopServer()
     local cursor = ""
@@ -96,7 +101,9 @@ function hopServer()
         local success, response = pcall(function() return HttpService:JSONDecode(game:HttpGet(url)) end)
         if success and response and response.data then
             for _, server in ipairs(response.data) do
-                if server.playing < server.maxPlayers and not visited[server.id] and server.id ~= game.JobId then
+                -- Kiểm tra xem pha trăng của server có phải là Full Moon không
+                local phaseName, index = getMoonPhase()
+                if server.playing < server.maxPlayers and not visited[server.id] and server.id ~= game.JobId and isFullMoon(phaseName, index) then
                     visited[server.id] = true
                     queue_on_teleport('loadstring(game:HttpGet("https://raw.githubusercontent.com/Chiriku2013/WebhookFullMoon/main/WebhookFullMoon.lua"))()')
                     TeleportService:TeleportToPlaceInstance(PlaceId, server.id)
@@ -116,7 +123,7 @@ while task.wait(math.random(4, 6)) do
     TextLabel.Text = "Moon Phase: "..phaseName.." ("..index.."/8)"
 
     -- Kiểm tra nếu pha trăng là Full Moon và là buổi tối
-    if phaseName == "FullMoon" and index == 5 and isNightTime() then
+    if isFullMoon(phaseName, index) and isNightTime() then
         sendWebhook(game.JobId, index, #Players:GetPlayers())
         task.wait(3)
     end

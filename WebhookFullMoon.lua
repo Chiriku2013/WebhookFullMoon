@@ -1,132 +1,50 @@
---// CONFIG
-local Webhook = "https://discord.com/api/webhooks/1366669467127382086/W-zfpbHnsXkpf8UZqzf9amT1nTYOBCOkKfwWJPa2ieIE81Jp-ZCKyq_lqyvc85ncfwa8"
 local HttpService = game:GetService("HttpService")
 local TeleportService = game:GetService("TeleportService")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
-local PlaceId = game.PlaceId
-local visited = {}
-visited[game.JobId] = true -- đánh dấu server hiện tại đã vào
+local Lighting = game:GetService("Lighting")
 
---// Moon phase format
-local moonPhases = {
-    "NewMoon", "WaxingCrescent", "FirstQuarter", "WaxingGibbous",
-    "FullMoon", "WaningGibbous", "LastQuarter", "WaningCrescent"
-}
+local webhook = "https://fe874317-1a34-47f4-9c99-29295a76d5c8-00-19hdq2tcg3p9t.sisko.replit.dev/fullmoon" -- Thay bằng link của bạn
 
---// Kiểm tra thời gian trong ngày (sáng hoặc tối)
-function isNightTime()
-    local hour = tonumber(os.date("%H"))
-    return hour >= 18 or hour < 6 -- Kiểm tra nếu giờ là buổi tối (18:00 - 06:00)
-end
-
-local function getPhaseIndex(name)
-    for i, phase in ipairs(moonPhases) do
-        if phase == name then return i end
-    end
-    return nil
-end
-
---// UI
-local ScreenGui = Instance.new("ScreenGui", game.CoreGui)
-ScreenGui.Name = "FullMoonUI"
-local TextLabel = Instance.new("TextLabel", ScreenGui)
-TextLabel.Size = UDim2.new(0.6, 0, 0.08, 0)
-TextLabel.Position = UDim2.new(0.2, 0, 0, 10)
-TextLabel.BackgroundTransparency = 1
-TextLabel.TextScaled = true
-TextLabel.Font = Enum.Font.GothamBlack
-TextLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-TextLabel.TextStrokeTransparency = 0.2
-TextLabel.Text = "Đang kiểm tra pha mặt trăng..."
-
---// Gửi Webhook
-function sendWebhook(jobId, phaseIndex, players)
-    local embed = {
-        ["title"] = "**Full Moon Notify🌕**",
-        ["color"] = 5814783,
-        ["fields"] = {
-            {["name"] = "🌕 Moon Phase:", ["value"] = tostring(phaseIndex).."/8", ["inline"] = true},
-            {["name"] = "👥 Players:", ["value"] = tostring(players).."/12", ["inline"] = true},
-            {["name"] = "🔗 Job ID:", ["value"] = jobId, ["inline"] = false},
-            {["name"] = "📜 Script Join:", ["value"] = 'game:GetService("ReplicatedStorage").__ServerBrowser:InvokeServer("teleport", "'..jobId..'")', ["inline"] = false},
-            {["name"] = "Credit", ["value"] = "**MADE BY: CHIRIKU**", ["inline"] = false}
-        },
-        ["footer"] = {
-            ["text"] = "MADE BY: CHIRIKU | "..os.date("Lúc %H:%M:%S")
-        },
-        ["thumbnail"] = {
-            ["url"] = "https://upload.wikimedia.org/wikipedia/commons/3/3c/FullMoon2010.jpg"
-        }
-    }
-
-    pcall(function()
-        syn.request({
-            Url = Webhook,
-            Method = "POST",
-            Headers = {["Content-Type"] = "application/json"},
-            Body = HttpService:JSONEncode({
-                ["embeds"] = {embed},
-                ["username"] = "Full Moon",
-                ["avatar_url"] = "https://cdn.discordapp.com/emojis/1087739432068577280.webp"
-            })
-        })
-    end)
-end
-
---// Lấy Moon Phase
 function getMoonPhase()
-    local ok, result = pcall(function()
-        return ReplicatedStorage.Remotes.CommF_:InvokeServer("GetMoon")
-    end)
-    
-    -- Tránh lỗi nil và chỉ kiểm tra pha trăng nếu là buổi tối
-    if ok and typeof(result) == "string" and isNightTime() then
-        local index = getPhaseIndex(result)
-        return result, index or 0
-    end
-    return "Unknown", 0
+	local success, phase = pcall(function()
+		return require(game.ReplicatedStorage.Util.Moon).phase
+	end)
+	return success and phase or 0
 end
 
---// Kiểm tra xem pha trăng có phải là Full Moon không
-function isFullMoon(phaseName, index)
-    return phaseName == "FullMoon" and index == 5
+function sendWebhook(phase)
+	local data = {
+		moon_phase = phase,
+		players = #Players:GetPlayers(),
+		jobid = game.JobId,
+		status = "FULL MOON!"
+	}
+
+	HttpService:PostAsync(webhook, HttpService:JSONEncode(data), Enum.HttpContentType.ApplicationJson)
 end
 
---// Server Hop
-function hopServer()
-    local cursor = ""
-    while true do
-        local url = "https://games.roblox.com/v1/games/"..PlaceId.."/servers/Public?limit=100"..(cursor ~= "" and "&cursor="..cursor or "")
-        local success, response = pcall(function() return HttpService:JSONDecode(game:HttpGet(url)) end)
-        if success and response and response.data then
-            for _, server in ipairs(response.data) do
-                -- Kiểm tra xem pha trăng của server có phải là Full Moon không
-                local phaseName, index = getMoonPhase()
-                if server.playing < server.maxPlayers and not visited[server.id] and server.id ~= game.JobId and isFullMoon(phaseName, index) then
-                    visited[server.id] = true
-                    queue_on_teleport('loadstring(game:HttpGet("https://raw.githubusercontent.com/Chiriku2013/WebhookFullMoon/main/WebhookFullMoon.lua"))()')
-                    TeleportService:TeleportToPlaceInstance(PlaceId, server.id)
-                    return
-                end
-            end
-            if not response.nextPageCursor then break else cursor = response.nextPageCursor end
-        else
-            break
-        end
-    end
+function smartHop()
+	local servers = {}
+	local req = syn.request({
+		Url = "https://games.roblox.com/v1/games/2753915549/servers/Public?sortOrder=Desc&limit=100",
+		Method = "GET"
+	})
+	local body = HttpService:JSONDecode(req.Body)
+	for _, server in pairs(body.data) do
+		if server.playing < server.maxPlayers then
+			table.insert(servers, server.id)
+		end
+	end
+	if #servers > 0 then
+		TeleportService:TeleportToPlaceInstance(game.PlaceId, servers[math.random(1, #servers)])
+	end
 end
 
---// MAIN
-while task.wait(math.random(4, 6)) do
-    local phaseName, index = getMoonPhase()
-    TextLabel.Text = "Moon Phase: "..phaseName.." ("..index.."/8)"
+task.wait(5) -- đợi game load
 
-    -- Kiểm tra nếu pha trăng là Full Moon và là buổi tối
-    if isFullMoon(phaseName, index) and isNightTime() then
-        sendWebhook(game.JobId, index, #Players:GetPlayers())
-        task.wait(3)
-    end
-
-    hopServer()
+local phase = getMoonPhase()
+if phase == 5 then
+	sendWebhook(phase)
+else
+	smartHop()
 end
